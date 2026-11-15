@@ -1,0 +1,225 @@
+---
+title: "SI544 Final Project"
+author: "Min-Yi Chen" 
+date: "`r Sys.Date()`"
+output: html_document
+---
+### 1. Introduction
+Nintendo's Wii and Switch are two of the most influential consoles in video game history. While the Wii introduced motion controls to a broad audience, the Switch revolutionized gaming with its hybrid portable-home console design. This project investigates whether there is a statistically significant difference in how players rate games on these two platforms.
+
+**Research Question:** Is there a significant difference in the average **User Score** between Nintendo Wii and Nintendo Switch games?
+
+The Nintendo Wii (2006) and Switch (2017) represent two distinct eras of gaming history. My project investigates whether the "modern" gaming experience on the Switch translates to higher player satisfaction compared to the "classic" Wii era.
+
+### 2. Data Preparation
+I used the NintendoGames.csv dataset, which contains metadata and review scores for Nintendo games.
+
+**Load library**
+```{r}
+library(moderndive)
+library(tidyverse)
+library(dplyr)
+library(infer)
+```
+
+**Data Cleaning**
+
+My analysis focuses on two platforms: Wii and Switch, and the data was cleaned using the following steps:
+
+- Convert platform names to lowercase for case-insensitive
+- Filtered the dataset to include only Wii and Switch games
+- Removed rows with missing score data
+```{r}
+game_data <- read_csv('NintendoGames.csv')
+
+# Data Cleaning
+analysis_data <- game_data %>%
+  # Convert platform names to lowercase for case-insensitive (so "WII" and "Wii" are treated as the same)
+  mutate(platform_clean = str_to_lower(platform)) %>%
+  # Keep only Wii and Switch games
+  filter(platform_clean %in% c("wii", "switch")) %>%
+  # using user_score and meta_score for analysis
+  select(platform_clean, user_score, meta_score) %>%
+  # Remove rows with missing scores (NA)
+  drop_na(user_score, meta_score)
+
+# Check sample sizes for each group
+analysis_data %>% count(platform_clean)
+```
+### 3. Correlation Analysis
+Before comparing the platforms, I wanted to decide which score metric to use: User Score (players) or Meta Score (critics). I analyzed the correlation between them to see if they represent the same thing.
+
+**Visualize the relationship**
+```{r}
+# meta_score (0-100) vs user_score (0-10)
+ggplot(analysis_data, aes(x = meta_score, y = user_score)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  geom_smooth(method = "lm", color = "pink", se = FALSE) + # Add a trend line
+  labs(title = "Relationship between Critic and User Scores",
+       subtitle = "Do players agree with critics?",
+       x = "Meta Score (Critics)",
+       y = "User Score (Players)") +
+  theme_minimal()
+```
+
+**Calculate the correlation coefficient**
+```{r}
+correlation_value <- analysis_data %>%
+  get_correlation(formula = user_score ~ meta_score)
+
+print(correlation_value)
+```
+**Result interpretation**
+
+The scatter plot shows a positive but moderate relationship (correlation about 0.5). While critics and users often agree on the best games, there is variation (the "cloud" of points is scattered). Since my research question is about player preference, and players often disagree with critics, I decided to rely solely on **user_score** for the main analysis to capture the community's true sentiment.
+
+### 4. Visualize Distribution between Switch and Wii
+Next, I used data visualization to compare the distribution of user scores between the two consoles.
+
+**boxplot**
+```{r}
+# use a boxplot to compare medians and score distributions between the two platforms
+ggplot(analysis_data, aes(x = platform_clean, y = user_score, fill = platform_clean)) +
+  geom_boxplot() +
+  labs(title = "User Score Distribution: Switch vs. Wii",
+       x = "Platform",
+       y = "User Score") +
+  theme_minimal()
+```
+
+**density plot**
+```{r}
+# Use a density plot to check normality 
+ggplot(analysis_data, aes(x = user_score, fill = platform_clean)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Density Plot of User Scores")
+```
+
+**Result interpretation**
+
+- Boxplot: The median score (thick black line) for the Wii is higher than for the Switch. The entire "box" for the Wii is shifted upwards, suggesting a generally higher standard of quality.
+- Density plot: The density plot reveals that Wii games (teal) have a sharper peak around scores of 8, indicating consistently higher ratings, whereas Switch games (pink) show a flatter, more varied score distribution.
+
+
+### 5. T-Test and Confidence Interval
+
+I performed a t-test to check if the difference in means is statistically significant.
+
+**Identify hypotheses**
+
+I defined the null hypothesis (H0) as there being no difference in the average user scores between the two platforms, while the alternative hypothesis (HA)was that a statistically significant difference exists.
+
+- H0 Null Hypothesis: There is no difference in the user average score between Switch and Wii games (μSwitch −μWii =0).
+- HA Alternative Hypothesis: There is difference in the user average score between Switch and Wii games (μSwitch −μWii !=0).
+
+**Perform t-test**
+```{r}
+# Perform t-test
+t_test_result <- t.test(user_score ~ platform_clean, data = analysis_data, var.equal = FALSE)
+t_test_result
+```
+
+**T-Test Results**
+
+Since p-value(0.001021) < 0.05, we reject the null hypothesis. There is a statistically significant difference between the two consoles.
+
+## 6. Linear Regression model
+
+To quantify the effect size, I built a linear regression model.
+
+```{r}
+# Build a linear model
+lm_model <- lm(user_score ~ platform_clean, data = analysis_data)
+
+# Display model summary (includes coefficients and p-values)
+get_regression_table(lm_model)
+```
+
+**Result interpretation**
+
+The baseline (Intercept) represents the average Switch score is 7.42. The coefficient for platform_clean: wii is 0.472. This means that Wii games score 0.47 points higher than Switch games in average. This result is statistically significant (p=0.002).
+
+Standard T-tests assume the data follows a specific shape (normal distribution). To validate my findings without worrying about these assumptions, I used a permutation test to confirm that the observed difference in scores is real and not just due to random chance.
+
+### 7. Simulation-Based Inference
+Standard T-tests assume the data follows a specific shape (normal distribution). To validate my findings without worrying about these assumptions, I used a permutation test to confirm that the observed difference in scores is real and not just due to random chance.
+
+**Compute the observed difference in means**
+```{r}
+# Calculate the real difference of mean between Switch and Wii
+obs_diff_means <- analysis_data %>%
+  specify(user_score ~ platform_clean) %>%
+  # Switch mean − Wii mean
+  calculate(stat = "diff in means", order = c("switch", "wii")) 
+print(paste("Observed Difference (Switch - Wii):", obs_diff_means$stat))
+```
+
+**Test the hypothesis**
+
+Simulate a world where there is no difference between Switch and Wii
+
+```{r}
+set.seed(123)
+# Create the Null distribution (Simulate a world where there is no difference between Switch and Wii)
+null_distribution_games <- analysis_data %>%
+  specify(user_score ~ platform_clean) %>%
+  hypothesize(null = "independence") %>% # Score is independent of platform under H0
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("switch", "wii"))
+```
+
+**Visualize the p-value**
+
+```{r}
+# Visualize the Null distribution
+# Plot the simulated distribution and mark the observed statistic (red line)
+visualize(null_distribution_games) +
+  shade_p_value(obs_stat = obs_diff_means, direction = "both") +
+  labs(title = "Simulation-Based Null Distribution",
+       subtitle = "Red line = Observed Difference between Switch and Wii",
+       x = "Difference in Means (Switch - Wii)",
+       y = "Count")
+```
+
+**Calculate the p-value**
+
+```{r}
+# Calculate the p-value
+p_value <- null_distribution_games %>%
+  get_p_value(obs_stat = obs_diff_means, direction = "both")
+
+print(p_value)
+```
+
+**Simulation Result**
+The simulated p-value is 0.002. This confirms the T-test result: the observed difference (-0.47) is extremely unlikely to happen by chance.
+
+**Assumption check**
+I checked the residuals of the linear model to ensure constant variance.
+```{r}
+# Check constant variance (homoscedasticity)
+regression_points <- get_regression_points(lm_model)
+
+ggplot(regression_points, aes(x = platform_clean, y = residual)) +
+  geom_jitter(width = 0.1, alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "red") +
+  labs(title = "Residual Plot",
+       subtitle = "Checking for Constant Variance")
+```
+
+Check: The residuals are distributed relatively evenly around the red line (0) for both groups. There is no obvious funnel shape, suggesting the assumption of constant variance is met.
+
+### 8. Conclusion
+
+**Summary of Findings**
+
+In this analysis, I investigated whether user scores differ between Nintendo Switch and Wii games.
+- Statistical Significance: Both the T-test (p=0.001021) and the Permutation test (p=0.002) confirm a significant difference.
+- Direction of Effect: Wii games have a significantly higher average user score (7.89) compared to Switch games (7.42).
+- Regression Model: The regression model estimates that Wii games score on average 0.47 points higher than Switch games.
+
+**Discussion & Limitations**
+
+The analysis resulted in a p-value of approximately 0.001, allowing us to reject the null hypothesis. This confirms a statistically significant difference between the two platforms. However, contrary to my initial idea that the newer, more advanced console:Switch would have higher ratings, the data shows that Nintendo Wii games have a higher average user score than Nintendo Switch games. The effect size is approximately 0.47 points.
+One reason is likely nostalgia. The Wii is almost 20 years old. People rating these games today might remember them better than they actually were, forgiving technical flaws that they might criticize in modern Switch games. Additionally, the expectations for game visuals were lower in 2006 compared to the high standards of the modern era.
+Another major reason is sample bias. The dataset has nearly twice as many Switch games as Wii games. The Switch list is newer and larger, so it probably includes more average or low-budget games that pull the average score down. So, the higher Wii scores might come from a curated list of classics rather than superior quality. In conclusion, even though the Switch is technologically superior, the data shows that Wii games have higher user ratings. This suggests that good graphics do not guarantee player satisfaction. However, this result is likely influenced by nostalgia and bias, proving that context is just as important as the numbers when comparing different gaming eras.

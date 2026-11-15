@@ -2,6 +2,8 @@
 
 A statistical comparison of user ratings for Nintendo Wii and Switch games in R: correlation, t-test, linear regression, and a permutation test.
 
+*SI 544 (Statistics and Information Science), University of Michigan School of Information*
+
 **Skills shown:** data cleaning with `tidyverse`, exploratory visualization (`ggplot2`), hypothesis testing, linear regression with `moderndive`, simulation-based inference with `infer`, regression assumption checks, communicating results.
 
 ## Question
@@ -65,12 +67,12 @@ The difference is statistically significant, but it describes this dataset, not 
 
 ## Full write-up
 
-- [Report (PDF)](docs/SI_544_Final_Project_Report_Chen.pdf): methods, figures, and discussion
-- [Presentation slides (PDF)](docs/SI_544_Final_Project.pdf)
-- [Analysis code (R Markdown)](544_Final_Project.Rmd)
+- [Report (PDF)](docs/wii-vs-switch-report.pdf): methods, figures, and discussion
+- [Presentation slides (PDF)](docs/wii-vs-switch-slides.pdf)
+- [Analysis code (R Markdown)](wii-vs-switch-analysis.Rmd)
 
 ## Run it yourself
 
 1. Download `NintendoGames.csv` from the [Kaggle page](https://www.kaggle.com/datasets/joebeachcapital/nintendo-games) and put it in the same folder as the `.Rmd` file.
 2. Install the packages: `install.packages(c("tidyverse", "moderndive", "infer"))`
-3. Open `544_Final_Project.Rmd` in RStudio and click **Knit**.
+3. Open `wii-vs-switch-analysis.Rmd` in RStudio and click **Knit**.
